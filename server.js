@@ -1,6 +1,5 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const { Pool } = require('pg');
 
@@ -14,8 +13,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false } // обязательно для Render
 });
 
-// ================== АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ТАБЛИЦЫ ==================
-(async () => {
+// ================== Функция инициализации базы ==================
+async function initDB() {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -24,11 +23,12 @@ const pool = new Pool({
         password TEXT NOT NULL
       );
     `);
-    console.log("Таблица users готова");
+    console.log("✅ Таблица users готова");
   } catch (err) {
-    console.error("Ошибка при создании таблицы:", err);
+    console.error("❌ Ошибка при создании таблицы:", err);
+    process.exit(1); // остановить сервер, если база недоступна
   }
-})();
+}
 
 // ================== РЕГИСТРАЦИЯ ==================
 app.post('/register', async (req, res) => {
@@ -39,7 +39,6 @@ app.post('/register', async (req, res) => {
   }
 
   try {
-    // Проверяем, есть ли пользователь
     const userCheck = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ message: 'Такой email уже зарегистрирован' });
@@ -54,7 +53,7 @@ app.post('/register', async (req, res) => {
 
     res.json({ message: 'Регистрация успешна!' });
   } catch (err) {
-    console.error("Ошибка при регистрации:", err);
+    console.error("❌ Ошибка при регистрации:", err);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
 });
@@ -64,17 +63,23 @@ app.get('/', (req, res) => {
   res.send('API работает!');
 });
 
-// ================== ВРЕМЕННЫЙ GET /users ==================
+// ================== GET /users ==================
 app.get('/users', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, email FROM users');
-    res.json(result.rows); // только id и email, пароли не показываем
+    res.json(result.rows); // показываем только id и email
   } catch (err) {
-    console.error("Ошибка при получении пользователей:", err);
+    console.error("❌ Ошибка при получении пользователей:", err);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
 });
 
-// ================== ЗАПУСК СЕРВЕРА ==================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// ================== СТАРТ СЕРВЕРА ==================
+async function startServer() {
+  await initDB(); // сначала инициализация базы
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
+
+startServer();
