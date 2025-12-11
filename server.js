@@ -63,3 +63,9 @@ app.get('/', (req, res) => {
 // запуск сервера
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+//  получение зарег юзеров
+app.get('/users', (req, res) => {
+  const users = loadUsers(); // загружаем пользователей из файла
+  res.json(users);           // отправляем JSON в браузер
+});
