@@ -166,5 +166,16 @@ async function startServer() {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 }
+// Для продакшена: такой эндпоинт обычно делают защищённым через JWT. 
+//  сделать /users только для админа ?
+app.get('/users', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, email FROM users');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
 
 startServer();
