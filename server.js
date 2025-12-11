@@ -1,71 +1,54 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
 const cors = require('cors');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-const USERS_FILE = './users.json';
+// Подключение к PostgreSQL через Render DATABASE_URL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // обязательно для Render
+});
 
-// загружаем список пользователей
-function loadUsers() {
-  if (!fs.existsSync(USERS_FILE)) return [];
-  return JSON.parse(fs.readFileSync(USERS_FILE));
-}
-
-// сохраняем пользователей
-function saveUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-// =============== РЕГИСТРАЦИЯ =================
+// ================== РЕГИСТРАЦИЯ ==================
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
 
-  // простая валидация
   if (!email || !password) {
     return res.status(400).json({ message: 'Email и пароль обязательны' });
   }
 
-  const users = loadUsers();
-
-  // проверяем, существует ли пользователь
-  const exists = users.find(u => u.email === email);
-  if (exists) {
+  // Проверяем, есть ли пользователь
+  const userCheck = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+  if (userCheck.rows.length > 0) {
     return res.status(400).json({ message: 'Такой email уже зарегистрирован' });
   }
 
-  // хешируем пароль
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // создаем нового пользователя
-  const newUser = {
-    id: Date.now(),
-    email,
-    password: hashedPassword
-  };
-
-  users.push(newUser);
-  saveUsers(users);
+  await pool.query(
+    'INSERT INTO users (email, password) VALUES ($1, $2)',
+    [email, hashedPassword]
+  );
 
   res.json({ message: 'Регистрация успешна!' });
 });
 
-// ==============================================
-
+// ================== ПРОВЕРКА СЕРВЕРА ==================
 app.get('/', (req, res) => {
   res.send('API работает!');
 });
 
-// запуск сервера
+// ================== ВРЕМЕННЫЙ GET /users ==================
+app.get('/users', async (req, res) => {
+  const result = await pool.query('SELECT id, email FROM users');
+  res.json(result.rows); // только id и email, пароли не показываем
+});
+
+// ================== ЗАПУСК СЕРВЕРА ==================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-//  получение зарег юзеров
-app.get('/users', (req, res) => {
-  const users = loadUsers(); // загружаем пользователей из файла
-  res.json(users);           // отправляем JSON в браузер
-});
