@@ -49,3 +49,32 @@ app.post('/register', async (req, res) => {
 
     await pool.query(
       'INSERT INTO users (email, password) VALUES ($1, $2)',
+      [email, hashedPassword]
+    );
+
+    res.json({ message: 'Регистрация успешна!' });
+  } catch (err) {
+    console.error("Ошибка при регистрации:", err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// ================== ПРОВЕРКА СЕРВЕРА ==================
+app.get('/', (req, res) => {
+  res.send('API работает!');
+});
+
+// ================== ВРЕМЕННЫЙ GET /users ==================
+app.get('/users', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, email FROM users');
+    res.json(result.rows); // только id и email, пароли не показываем
+  } catch (err) {
+    console.error("Ошибка при получении пользователей:", err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// ================== ЗАПУСК СЕРВЕРА ==================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
